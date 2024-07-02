@@ -1,0 +1,46 @@
+# 工作流名称
+name: Build and Deploy
+
+on:
+  # 指明要运行的分支，跟上面配置保持一致
+  push:
+    branches: [main]
+
+jobs:
+  semantic-release:
+    name: semantic-release
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+      - name: Semantic release
+        id: semantic   # Need an `id` for output variables
+        uses: cycjimmy/semantic-release-action@v3
+        with:
+          extra_plugins: |
+            @semantic-release/changelog
+            @semantic-release/git
+            conventional-changelog-conventionalcommits@7.0.2
+          branch: main
+          semantic_version: 19.0.2  # It is recommended to specify specifying version range
+          # for semantic-release. https://github.com/semantic-release/semantic-release/releases
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+    outputs:
+      new_release_published: ${{steps.semantic.outputs.new_release_published }}
+      new_release_version: ${{ steps.semantic.outputs.new_release_version }}
+  slackNotification:
+    needs: [ semantic-release ]
+    name: Slack Notification
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - name: Slack Notification
+        uses: rtCamp/action-slack-notify@master
+        env:
+          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
+          SLACK_ICON: https://github.com/xinatcg/public/raw/main/gh.png
+          SLACK_USERNAME: GitHub Action
+          SLACK_MESSAGE: '${{ github.event.repository.name }} Build finish successfully :rocket: New version: ${{ needs.semantic-release.outputs.new_release_version }}'
